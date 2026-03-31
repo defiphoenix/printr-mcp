@@ -8,23 +8,26 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  actions: write
 
 jobs:
   release-please:
     runs-on: ubuntu-latest
     outputs:
-      release_created: ${{ steps.release.outputs.release_created }}
-      tag_name: ${{ steps.release.outputs.tag_name }}
+      releases_created: ${{ steps.release.outputs.releases_created }}
+      sdk_release_created: ${{ steps.release.outputs['packages/sdk--release_created'] }}
+      mcp_release_created: ${{ steps.release.outputs['packages/mcp--release_created'] }}
+      cli_release_created: ${{ steps.release.outputs['packages/cli--release_created'] }}
     steps:
-      - uses: googleapis/release-please-action@v4
+      - uses: googleapis/release-please-action@v4.4.0
         id: release
         with:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
-          release-type: node
 
-  publish:
+  # Shared setup job that all publish jobs depend on
+  setup:
     needs: release-please
-    if: ${{ needs.release-please.outputs.release_created }}
+    if: ${{ needs.release-please.outputs.releases_created }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -34,25 +37,100 @@ jobs:
         with:
           bun-version: latest
 
-      - name: Setup Node (for npm publish)
-        uses: actions/setup-node@v4
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build all packages
+        run: bun run build
+
+      - name: Cache build artifacts
+        uses: actions/cache/save@v4
         with:
-          node-version: "20"
-          registry-url: "https://registry.npmjs.org"
+          path: |
+            packages/*/dist
+            node_modules
+          key: build-${{ github.sha }}
+
+  publish-sdk:
+    needs: [release-please, setup]
+    if: ${{ needs.release-please.outputs.sdk_release_created == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Restore build artifacts
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            packages/*/dist
+            node_modules
+          key: build-${{ github.sha }}
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Check types
-        run: bunx tsc --noEmit
-
-      - name: Run tests
-        run: bun run test
-
-      - name: Build
-        run: bun run build
-
-      - name: Publish to npm
-        run: npm publish --access public
+      - name: Publish @printr/sdk
+        run: cd packages/sdk && bun publish --access public
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish-mcp:
+    needs: [release-please, setup]
+    if: ${{ needs.release-please.outputs.mcp_release_created == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Restore build artifacts
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            packages/*/dist
+            node_modules
+          key: build-${{ github.sha }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Publish @printr/mcp
+        run: cd packages/mcp && bun publish --access public
+        env:
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish-cli:
+    needs: [release-please, setup]
+    if: ${{ needs.release-please.outputs.cli_release_created == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Restore build artifacts
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            packages/*/dist
+            node_modules
+          key: build-${{ github.sha }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Publish @printr/cli
+        run: cd packages/cli && bun publish --access public
+        env:
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}

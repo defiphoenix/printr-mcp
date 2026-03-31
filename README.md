@@ -32,6 +32,16 @@ Or with `bunx`:
 }
 ```
 
+### Skills
+
+If your agent runtime supports skills, you can install Printr directly:
+
+```sh
+npx skills add PrintrFi/printr-mcp
+```
+
+See the [skill definition](packages/cli/skills/printr/SKILL.md) for details.
+
 ## Optional capabilities
 
 ### Auto-generate token images
@@ -73,13 +83,14 @@ By default, token creation returns an unsigned transaction that you sign via bro
 
 ## Environment variables
 
-| Variable                  | Description                                                            |
-| ------------------------- | ---------------------------------------------------------------------- |
-| `PRINTR_API_KEY`          | Partner API key. Falls back to the default public AI-integration key.  |
-| `OPENROUTER_API_KEY`      | Enables auto image generation and the `printr_generate_image` tool     |
-| `OPENROUTER_IMAGE_MODEL`  | Image model override (default: `google/gemini-2.5-flash-image`)        |
-| `EVM_WALLET_PRIVATE_KEY`  | Default EVM private key for autonomous signing                         |
-| `SVM_WALLET_PRIVATE_KEY`  | Default Solana keypair secret for autonomous signing                   |
+| Variable                      | Description                                                            |
+| ----------------------------- | ---------------------------------------------------------------------- |
+| `PRINTR_API_KEY`              | Partner API key. Falls back to the default public AI-integration key.  |
+| `OPENROUTER_API_KEY`          | Enables auto image generation and the `printr_generate_image` tool     |
+| `OPENROUTER_IMAGE_MODEL`      | Image model override (default: `google/gemini-2.5-flash-image`)        |
+| `EVM_WALLET_PRIVATE_KEY`      | Default EVM private key for autonomous signing                         |
+| `SVM_WALLET_PRIVATE_KEY`      | Default Solana keypair secret for autonomous signing                   |
+| `PRINTR_DEPLOYMENT_PASSWORD`  | Master password for encrypting deployment wallets (min 16 chars). Required for `printr_fund_deployment_wallet`. Generate with: `openssl rand -base64 32` |
 
 ### Dev / self-hosting
 
@@ -90,11 +101,45 @@ By default, token creation returns an unsigned transaction that you sign via bro
 
 ## Development
 
-```sh
-bun install
-bun dev
-```
+This is a monorepo with three packages:
+- `@printr/sdk` — Core TypeScript SDK (framework-agnostic)
+- `@printr/mcp` — MCP server wrapping the SDK
+- `@printr/cli` — CLI for setup and configuration
 
 ```sh
-bun test
+bun install
+bun dev          # Run MCP server with hot reload
+bun test         # Run all tests
+bun run check    # typecheck + lint + test
+```
+
+### Package-specific commands
+
+```sh
+# SDK
+bun run --cwd packages/sdk test
+bun run --cwd packages/sdk build
+
+# MCP
+bun run --cwd packages/mcp test
+bun run --cwd packages/mcp build
+```
+
+### Using the SDK directly
+
+```typescript
+import { createPrintrClient, buildToken } from '@printr/sdk';
+
+const client = createPrintrClient({
+  apiKey: process.env.PRINTR_API_KEY,
+});
+
+const result = await buildToken({
+  creator_accounts: ['eip155:8453:0x...'],
+  name: 'My Token',
+  symbol: 'TKN',
+  description: 'A cool token',
+  chains: ['eip155:8453'],
+  initial_buy: { spend_usd: 10 },
+}, client);
 ```
