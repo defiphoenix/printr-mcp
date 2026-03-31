@@ -16,11 +16,16 @@ _.log
 report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # dotenv environment variable files
-.env
 .env.development.local
 .env.test.local
 .env.production.local
-.env.local
+
+# certificates (except committed local.printr.dev cert)
+*.pem
+*.key
+*.p12
+!packages/mcp/certs/*.pem
+!packages/mcp/certs/*.key
 
 # caches
 .eslintcache
@@ -40,3 +45,8 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # temp files
 .tmp/
+branch_structure.json
+temp_auto_push.bat
+temp_interactive_push.bat
+.gitignore
+config.bat
